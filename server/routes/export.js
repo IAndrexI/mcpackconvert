@@ -1,11 +1,26 @@
 import { Router } from 'express';
 import path from 'path';
 import fs from 'fs/promises';
-import { exportMrpack, exportPrismInstanceZip, deployToPrismLauncher } from '../services/prismExporter.js';
+import { exportMrpack, exportCurseForgeZip, exportPrismInstanceZip, deployToPrismLauncher } from '../services/prismExporter.js';
 import { PACKS_DIR } from '../services/packManager.js';
 import { getDefaultPrismInstancesPath, PORT } from '../config.js';
 
 const router = Router();
+
+// Export as CurseForge modpack zip (manifest.json + overrides)
+router.get('/:id/curseforge', async (req, res) => {
+  try {
+    const packDir = path.join(PACKS_DIR, req.params.id);
+    await fs.access(packDir);
+
+    res.attachment(`${req.params.id}-curseforge.zip`);
+    await exportCurseForgeZip(packDir, res);
+  } catch (err) {
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+});
 
 // Export as Modrinth .mrpack
 router.get('/:id/mrpack', async (req, res) => {

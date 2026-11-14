@@ -17,3 +17,4 @@ Thumbs.db
 data/*.zip
 data/*.mrpack
 data/server-info.json
+data/publisher-config.json

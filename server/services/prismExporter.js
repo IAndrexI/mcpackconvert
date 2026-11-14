@@ -282,3 +282,68 @@ export async function deployToPrismLauncher(packDir, { targetInstancesPath, auto
     instanceName: instanceFolderName
   };
 }
+
+/**
+ * Export pack directly as a CurseForge modpack zip (manifest.json + overrides/)
+ */
+export async function exportCurseForgeZip(packDir, outputStream) {
+  const packToml = await readTomlFile(path.join(packDir, 'pack.toml'));
+  const loaderName = Object.keys(packToml.versions).find(k => k !== 'minecraft') || 'fabric';
+  const loaderVer = packToml.versions[loaderName] || '';
+  const mcVer = packToml.versions.minecraft;
+
+  const modsDir = path.join(packDir, 'mods');
+  const files = [];
+
+  try {
+    const modFiles = await fs.readdir(modsDir);
+    for (const file of modFiles) {
+      if (file.endsWith('.pw.toml')) {
+        const pwData = await readTomlFile(path.join(modsDir, file));
+        if (pwData.update?.curseforge) {
+          files.push({
+            projectID: parseInt(pwData.update.curseforge['project-id'], 10),
+            fileID: parseInt(pwData.update.curseforge['file-id'], 10),
+            required: true
+          });
+        }
+      }
+    }
+  } catch (err) {}
+
+  const manifest = {
+    minecraft: {
+      version: mcVer,
+      modLoaders: [
+        {
+          id: `${loaderName}-${loaderVer}`,
+          primary: true
+        }
+      ]
+    },
+    manifestType: 'minecraftModpack',
+    manifestVersion: 1,
+    name: packToml.name || 'PackHub Pack',
+    version: packToml.version || '1.0.0',
+    author: packToml.author || 'PackHub',
+    files,
+    overrides: 'overrides'
+  };
+
+  const archive = archiver('zip', { zlib: { level: 9 } });
+  archive.pipe(outputStream);
+
+  archive.append(JSON.stringify(manifest, null, 2), { name: 'manifest.json' });
+
+  // Add config files in overrides/config
+  const configDir = path.join(packDir, 'config');
+  try {
+    await fs.access(configDir);
+    archive.directory(configDir, 'overrides/config');
+  } catch {}
+
+  // Include pack.toml in overrides for tracking
+  archive.file(path.join(packDir, 'pack.toml'), { name: 'overrides/pack.toml' });
+
+  await archive.finalize();
+}

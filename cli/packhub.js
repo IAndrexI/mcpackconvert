@@ -17,7 +17,8 @@ import {
 } from '../server/services/packManager.js';
 import { searchModrinth } from '../server/services/modrinth.js';
 import { searchCurseForge } from '../server/services/curseforge.js';
-import { exportPrismInstanceZip, exportMrpack, deployToPrismLauncher } from '../server/services/prismExporter.js';
+import { exportPrismInstanceZip, exportMrpack, exportCurseForgeZip, deployToPrismLauncher } from '../server/services/prismExporter.js';
+import { publishToModrinth, publishToCurseForge, publishToAll, getPublisherConfig, savePublisherConfig } from '../server/services/publisher.js';
 import { getDefaultPrismInstancesPath, PORT } from '../server/config.js';
 
 function resolvePackDir(packId) {
@@ -260,6 +261,135 @@ program
       console.log(chalk.gray(`In Prism Launcher: Drag-and-drop ${outPath} directly into the launcher window!`));
     } catch (err) {
       console.error(chalk.red('Export failed:'), err.message);
+    }
+  });
+
+// Command: export-curseforge
+program
+  .command('export-curseforge')
+  .description('Export pack as CurseForge modpack zip (manifest.json + overrides)')
+  .requiredOption('-p, --pack <packId>', 'Target pack ID')
+  .option('-o, --output <file>', 'Output zip path')
+  .action(async (opts) => {
+    try {
+      const packDir = resolvePackDir(opts.pack);
+      const outPath = opts.output || `${opts.pack}-curseforge.zip`;
+      const writeStream = createWriteStream(outPath);
+      console.log(chalk.blue(`Exporting CurseForge modpack zip to ${outPath}...`));
+      await exportCurseForgeZip(packDir, writeStream);
+      console.log(chalk.green.bold(` Exported: ${outPath}`));
+    } catch (err) {
+      console.error(chalk.red('Export failed:'), err.message);
+    }
+  });
+
+// Command: config-tokens
+program
+  .command('config-tokens')
+  .description('Configure API tokens for auto-publishing to Modrinth and CurseForge')
+  .option('--mr-token <token>', 'Modrinth API Token')
+  .option('--cf-token <token>', 'CurseForge API Token')
+  .action(async (opts) => {
+    try {
+      const updates = {};
+      if (opts.mrToken) updates.modrinthToken = opts.mrToken;
+      if (opts.cfToken) updates.curseforgeToken = opts.cfToken;
+
+      await savePublisherConfig(updates);
+      console.log(chalk.green.bold(' Publisher tokens saved successfully!'));
+      const cfg = await getPublisherConfig();
+      console.log(`  Modrinth Token: ${cfg.modrinthToken ? chalk.green('Configured') : chalk.gray('Not set')}`);
+      console.log(`  CurseForge Token: ${cfg.curseforgeToken ? chalk.green('Configured') : chalk.gray('Not set')}`);
+    } catch (err) {
+      console.error(chalk.red('Failed to save tokens:'), err.message);
+    }
+  });
+
+// Command: publish
+program
+  .command('publish')
+  .description('Auto-publish modpack directly to Modrinth and/or CurseForge')
+  .requiredOption('-p, --pack <packId>', 'Target pack ID')
+  .option('--all', 'Push to both Modrinth and CurseForge simultaneously', false)
+  .option('--modrinth', 'Push to Modrinth', false)
+  .option('--curseforge', 'Push to CurseForge', false)
+  .option('--mr-project <id>', 'Modrinth Project ID or Slug')
+  .option('--cf-project <id>', 'CurseForge Project ID')
+  .option('--mr-token <token>', 'Modrinth API Token (overrides saved token)')
+  .option('--cf-token <token>', 'CurseForge API Token (overrides saved token)')
+  .option('-v, --version-name <name>', 'Release version name')
+  .option('-n, --version-num <num>', 'Version number (e.g. 1.0.1)')
+  .option('-c, --changelog <text>', 'Changelog text')
+  .option('-t, --type <type>', 'Release type: release, beta, alpha', 'release')
+  .action(async (opts) => {
+    try {
+      const config = await getPublisherConfig();
+      const mrProject = opts.mrProject || config.projects?.[opts.pack]?.modrinthProjectId;
+      const cfProject = opts.cfProject || config.projects?.[opts.pack]?.curseforgeProjectId;
+      const mrToken = opts.mrToken || config.modrinthToken;
+      const cfToken = opts.cfToken || config.curseforgeToken;
+
+      const pushMr = opts.all || opts.modrinth || (!opts.curseforge && Boolean(mrProject));
+      const pushCf = opts.all || opts.curseforge || (!opts.modrinth && Boolean(cfProject));
+
+      if (!pushMr && !pushCf) {
+        console.log(chalk.yellow('Please specify a platform: --modrinth, --curseforge, or --all'));
+        console.log(chalk.gray('Example: packhub publish -p mypack --modrinth --mr-project my-modpack-slug'));
+        return;
+      }
+
+      console.log(chalk.cyan.bold(`\n🚀 Auto-Publishing Pack: ${opts.pack}...\n`));
+
+      if (pushMr) {
+        if (!mrProject) {
+          console.log(chalk.red('Missing Modrinth Project ID/Slug. Use --mr-project <slug>'));
+        } else if (!mrToken) {
+          console.log(chalk.red('Missing Modrinth Token. Configure with `packhub config-tokens --mr-token <token>` or use --mr-token'));
+        } else {
+          console.log(chalk.blue(`[Modrinth] Building .mrpack and pushing to project '${mrProject}'...`));
+          try {
+            const res = await publishToModrinth({
+              packId: opts.pack,
+              projectId: mrProject,
+              token: mrToken,
+              versionName: opts.versionName,
+              versionNumber: opts.versionNum,
+              changelog: opts.changelog,
+              versionType: opts.type
+            });
+            console.log(chalk.green.bold(` [Modrinth] Released version ${res.versionNumber} successfully!`));
+            console.log(chalk.cyan(`  URL: ${res.url}\n`));
+          } catch (err) {
+            console.log(chalk.red(` [Modrinth] Upload failed: ${err.message}\n`));
+          }
+        }
+      }
+
+      if (pushCf) {
+        if (!cfProject) {
+          console.log(chalk.red('Missing CurseForge Project ID. Use --cf-project <id>'));
+        } else if (!cfToken) {
+          console.log(chalk.red('Missing CurseForge Token. Configure with `packhub config-tokens --cf-token <token>` or use --cf-token'));
+        } else {
+          console.log(chalk.blue(`[CurseForge] Building modpack zip and pushing to project '${cfProject}'...`));
+          try {
+            const res = await publishToCurseForge({
+              packId: opts.pack,
+              projectId: cfProject,
+              token: cfToken,
+              displayName: opts.versionName,
+              changelog: opts.changelog,
+              releaseType: opts.type
+            });
+            console.log(chalk.green.bold(` [CurseForge] File uploaded successfully (ID: ${res.fileId})!`));
+            console.log(chalk.cyan(`  URL: ${res.url}\n`));
+          } catch (err) {
+            console.log(chalk.red(` [CurseForge] Upload failed: ${err.message}\n`));
+          }
+        }
+      }
+    } catch (err) {
+      console.error(chalk.red('Publish failed:'), err.message);
     }
   });
 

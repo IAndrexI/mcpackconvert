@@ -61,7 +61,8 @@
             </div>
           </div>
           <div class="pack-actions-bar">
-            <button class="btn btn-prism" id="btn-prism-dialog">🚀 Prism Launcher</button>
+            <button class="btn btn-primary" id="btn-open-publish" style="background: linear-gradient(135deg, #10b981 0%, #f97316 100%); border: none;">🚀 Auto-Push</button>
+            <button class="btn btn-prism" id="btn-prism-dialog">Prism Launcher</button>
             <button class="btn btn-secondary" id="btn-check-updates">🔍 Check Updates</button>
             <button class="btn btn-primary" id="btn-open-search">➕ Add Mods</button>
           </div>
@@ -246,6 +247,108 @@
           <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted);">
             Point the packwiz-installer or Prism pre-launch hook to this URL for automatic updates every time the game boots!
           </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Auto-Push & Publish (Modrinth & CurseForge) -->
+  <div class="modal-overlay" id="modal-publish">
+    <div class="modal" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+          🚀 Auto-Push to Modrinth & CurseForge
+        </h3>
+        <button class="btn btn-secondary btn-sm close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- Tabs -->
+        <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem;">
+          <button class="tab-btn active" id="tab-publish-run">Publish Release</button>
+          <button class="tab-btn" id="tab-publish-settings">API Tokens & Settings</button>
+        </div>
+
+        <!-- Panel 1: Publish Form -->
+        <div id="panel-publish-run">
+          <!-- Target Selection -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+            <!-- Modrinth Card -->
+            <div class="card" style="border-color: rgba(27, 217, 106, 0.4); padding: 1rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; cursor: pointer; color: var(--accent-modrinth);">
+                <input type="checkbox" id="pub-check-modrinth" checked>
+                <span>🟢 Modrinth (.mrpack)</span>
+              </label>
+              <div style="margin-top: 0.5rem;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Project ID or Slug</label>
+                <input type="text" class="form-input" id="pub-mr-project" placeholder="e.g. my-awesome-pack" style="font-size: 0.8rem;">
+              </div>
+              <div id="pub-mr-token-status" style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.35rem;">Checking token...</div>
+            </div>
+
+            <!-- CurseForge Card -->
+            <div class="card" style="border-color: rgba(241, 100, 54, 0.4); padding: 1rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 600; cursor: pointer; color: var(--accent-curseforge);">
+                <input type="checkbox" id="pub-check-curseforge" checked>
+                <span>🟠 CurseForge (Zip)</span>
+              </label>
+              <div style="margin-top: 0.5rem;">
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">CurseForge Project ID</label>
+                <input type="text" class="form-input" id="pub-cf-project" placeholder="e.g. 123456" style="font-size: 0.8rem;">
+              </div>
+              <div id="pub-cf-token-status" style="font-size: 0.7rem; color: var(--text-muted); margin-top: 0.35rem;">Checking token...</div>
+            </div>
+          </div>
+
+          <!-- Release Metadata -->
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <label>Release Title</label>
+              <input type="text" class="form-input" id="pub-version-name" placeholder="e.g. v1.0.1 - New Adventures">
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label>Release Type</label>
+              <select class="form-select" id="pub-release-type">
+                <option value="release">Release</option>
+                <option value="beta">Beta</option>
+                <option value="alpha">Alpha</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Changelog (Markdown supported)</label>
+            <textarea class="form-input" id="pub-changelog" rows="4" placeholder="Describe what changed in this version..." style="resize: vertical; font-family: monospace; font-size: 0.85rem;"></textarea>
+          </div>
+
+          <!-- Big Flush Push Button -->
+          <button class="btn btn-primary" id="btn-execute-publish" style="width: 100%; justify-content: center; padding: 0.8rem; font-size: 1rem; background: linear-gradient(135deg, #10b981 0%, #f97316 100%); border: none;">
+            ⚡ Flush Auto-Push to Platforms
+          </button>
+
+          <!-- Result Logs -->
+          <div id="publish-logs" style="margin-top: 1rem; display: none;"></div>
+        </div>
+
+        <!-- Panel 2: Tokens / Settings Form -->
+        <div id="panel-publish-settings" style="display: none;">
+          <div class="form-group">
+            <label style="display: flex; justify-content: space-between;">
+              <span>Modrinth API Token</span>
+              <a href="https://modrinth.com/settings/pats" target="_blank" style="color: var(--accent-modrinth); font-size: 0.75rem; text-decoration: none;">Create Token (create_version scope) ↗</a>
+            </label>
+            <input type="password" class="form-input" id="input-token-modrinth" placeholder="mrp_...">
+          </div>
+
+          <div class="form-group">
+            <label style="display: flex; justify-content: space-between;">
+              <span>CurseForge API Token</span>
+              <a href="https://curseforge.com/account/api-tokens" target="_blank" style="color: var(--accent-curseforge); font-size: 0.75rem; text-decoration: none;">Get Token ↗</a>
+            </label>
+            <input type="password" class="form-input" id="input-token-curseforge" placeholder="CurseForge API Token">
+          </div>
+
+          <button class="btn btn-primary btn-sm" id="btn-save-tokens">Save Tokens</button>
+          <span id="save-tokens-feedback" style="font-size: 0.8rem; margin-left: 0.5rem; color: #4ade80;"></span>
         </div>
       </div>
     </div>

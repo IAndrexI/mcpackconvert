@@ -17,13 +17,19 @@ A modern, self-hostable modpack manager inspired by **packwiz**, featuring simul
    - **Automatic Dependency Resolution**: Automatically detects and installs required dependencies (e.g. Fabric API, Architectury).
    - **Cross-Platform Update Checker**: Live-scans installed mods against both APIs to detect newer versions and lets you update individually or all at once.
 
-3. **Prism Launcher Integration**:
+3. **Flush 1-Click Auto-Push to Modrinth & CurseForge**:
+   - Seamlessly publish releases to **both Modrinth (`.mrpack`) and CurseForge (`manifest.json`)** with a single click.
+   - Set release titles, version numbers, changelogs, and release channels (Release/Beta/Alpha).
+   - Save your API tokens once for zero-friction future releases.
+   - Live status reporting with direct links to the published versions on both platforms.
+
+4. **Prism Launcher Integration**:
    - **Option 1: Ready-to-Play Prism Instance (`.zip`)**: Download a pre-configured zip with `mmc-pack.json` and `instance.cfg`. In Prism Launcher: *Add Instance ➜ Import from zip*.
    - **Option 2: 1-Click Direct Deploy**: Drops the instance directly into your local Prism Launcher `instances/` folder. Open Prism Launcher and click Play!
    - **Option 3: Modrinth `.mrpack` Export**: Drag-and-drop directly into Prism Launcher for multi-threaded parallel downloads.
    - **Option 4: Live Auto-Syncing**: Prism instances can use the self-hosted PackHub pack URL to auto-update mods every time you launch the game.
 
-4. **100% Packwiz TOML Compatible**:
+5. **100% Packwiz TOML Compatible**:
    - Reads and writes standard `pack.toml`, `index.toml`, and `.pw.toml` files with SHA-256 / SHA-1 checksum validation.
    - Existing packwiz packs work out of the box.
 
@@ -97,6 +103,15 @@ node cli/packhub.js export-prism -p betteradv --deploy
 
 # Export as Modrinth .mrpack
 node cli/packhub.js export-mrpack -p betteradv -o mypack.mrpack
+
+# Export as CurseForge modpack zip
+node cli/packhub.js export-curseforge -p betteradv -o mypack-curseforge.zip
+
+# Save your platform API tokens
+node cli/packhub.js config-tokens --mr-token "mrp_..." --cf-token "your_token"
+
+# Flush push release to BOTH Modrinth & CurseForge simultaneously!
+node cli/packhub.js publish -p betteradv --all --mr-project my-modpack-slug --cf-project 123456 -v "v1.0.1" -c "Changelog text"
 ```
 
 ---

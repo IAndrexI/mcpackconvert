@@ -19,6 +19,7 @@ const filterInstalledInput = document.getElementById('filter-installed-mods');
 const modalNewPack = document.getElementById('modal-new-pack');
 const modalSearch = document.getElementById('modal-search');
 const modalPrism = document.getElementById('modal-prism');
+const modalPublish = document.getElementById('modal-publish');
 
 // Alerts
 const updateAlert = document.getElementById('update-alert');
@@ -45,6 +46,10 @@ function setupEventListeners() {
     if (!currentPack) return alert('Select or create a modpack first!');
     setupPrismDialog();
     openModal(modalPrism);
+  });
+  document.getElementById('btn-open-publish').addEventListener('click', () => {
+    if (!currentPack) return alert('Select or create a modpack first!');
+    openPublishDialog();
   });
 
   // Modal close buttons
@@ -541,6 +546,231 @@ async function handleDeployLocalPrism() {
   } catch (err) {
     resultDiv.style.color = 'var(--accent-danger)';
     resultDiv.textContent = 'Error: ' + err.message;
+  }
+}
+
+// ----------------- AUTO-PUSH & PUBLISH INTEGRATION -----------------
+
+let publisherConfig = { hasModrinthToken: false, hasCurseForgeToken: false, projects: {} };
+
+async function openPublishDialog() {
+  if (!currentPack) return;
+
+  // Set default metadata
+  document.getElementById('pub-version-name').value = `${currentPack.name} v${currentPack.version || '1.0.0'}`;
+  document.getElementById('pub-changelog').value = `### ${currentPack.name} v${currentPack.version || '1.0.0'}\n- Built for Minecraft ${currentPack.mcVersion} (${currentPack.loader})\n- Updated mod files and configs`;
+  document.getElementById('publish-logs').style.display = 'none';
+
+  // Setup tabs
+  const tabRun = document.getElementById('tab-publish-run');
+  const tabSettings = document.getElementById('tab-publish-settings');
+  const panelRun = document.getElementById('panel-publish-run');
+  const panelSettings = document.getElementById('panel-publish-settings');
+
+  tabRun.onclick = () => {
+    tabRun.classList.add('active');
+    tabSettings.classList.remove('active');
+    panelRun.style.display = 'block';
+    panelSettings.style.display = 'none';
+  };
+
+  tabSettings.onclick = () => {
+    tabSettings.classList.add('active');
+    tabRun.classList.remove('active');
+    panelSettings.style.display = 'block';
+    panelRun.style.display = 'none';
+  };
+
+  // Load publisher config
+  try {
+    const res = await fetch('/api/publish/config');
+    const data = await res.json();
+    if (data.success) {
+      publisherConfig = data;
+      const mrStatus = document.getElementById('pub-mr-token-status');
+      const cfStatus = document.getElementById('pub-cf-token-status');
+
+      if (data.hasModrinthToken) {
+        mrStatus.innerHTML = `<span style="color: #4ade80;">🟢 Token Configured</span>`;
+      } else {
+        mrStatus.innerHTML = `<span style="color: var(--accent-warning);">⚠️ Token Missing (Click Settings tab)</span>`;
+      }
+
+      if (data.hasCurseForgeToken) {
+        cfStatus.innerHTML = `<span style="color: #4ade80;">🟢 Token Configured</span>`;
+      } else {
+        cfStatus.innerHTML = `<span style="color: var(--accent-warning);">⚠️ Token Missing (Click Settings tab)</span>`;
+      }
+
+      // Prefill project IDs if saved
+      const saved = data.projects?.[currentPack.id] || {};
+      if (saved.modrinthProjectId) {
+        document.getElementById('pub-mr-project').value = saved.modrinthProjectId;
+      }
+      if (saved.curseforgeProjectId) {
+        document.getElementById('pub-cf-project').value = saved.curseforgeProjectId;
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching publisher config:', err);
+  }
+
+  // Setup save tokens button
+  document.getElementById('btn-save-tokens').onclick = async () => {
+    const mrToken = document.getElementById('input-token-modrinth').value.trim();
+    const cfToken = document.getElementById('input-token-curseforge').value.trim();
+    const feedback = document.getElementById('save-tokens-feedback');
+
+    const updates = {};
+    if (mrToken) updates.modrinthToken = mrToken;
+    if (cfToken) updates.curseforgeToken = cfToken;
+
+    try {
+      const res = await fetch('/api/publish/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      const data = await res.json();
+      if (data.success) {
+        feedback.textContent = 'Saved!';
+        setTimeout(() => { feedback.textContent = ''; }, 3000);
+        openPublishDialog(); // Refresh status indicators
+      }
+    } catch (e) {
+      feedback.textContent = 'Failed: ' + e.message;
+    }
+  };
+
+  // Setup execute publish button
+  document.getElementById('btn-execute-publish').onclick = handleExecutePublish;
+
+  openModal(modalPublish);
+}
+
+async function handleExecutePublish() {
+  if (!currentPack) return;
+
+  const pushMr = document.getElementById('pub-check-modrinth').checked;
+  const pushCf = document.getElementById('pub-check-curseforge').checked;
+  const mrProject = document.getElementById('pub-mr-project').value.trim();
+  const cfProject = document.getElementById('pub-cf-project').value.trim();
+  const versionName = document.getElementById('pub-version-name').value.trim();
+  const changelog = document.getElementById('pub-changelog').value.trim();
+  const releaseType = document.getElementById('pub-release-type').value;
+
+  if (!pushMr && !pushCf) {
+    return alert('Please select at least one platform (Modrinth or CurseForge) to push to!');
+  }
+
+  if (pushMr && !mrProject) {
+    return alert('Please enter your Modrinth Project ID or Slug!');
+  }
+
+  if (pushCf && !cfProject) {
+    return alert('Please enter your CurseForge Project ID!');
+  }
+
+  const btn = document.getElementById('btn-execute-publish');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Generating & Auto-Pushing to Platforms...';
+
+  const logsEl = document.getElementById('publish-logs');
+  logsEl.style.display = 'block';
+  logsEl.innerHTML = `<div style="font-size: 0.85rem; color: var(--text-muted); text-align: center; padding: 1rem;">Packing archives and dispatching to APIs...</div>`;
+
+  // Save project IDs for this pack so user never has to re-enter
+  const projectsUpdate = {
+    [currentPack.id]: {
+      modrinthProjectId: mrProject,
+      curseforgeProjectId: cfProject
+    }
+  };
+  fetch('/api/publish/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projects: projectsUpdate })
+  }).catch(() => {});
+
+  try {
+    const payload = {
+      modrinthProjectId: pushMr ? mrProject : null,
+      curseforgeProjectId: pushCf ? cfProject : null,
+      versionName,
+      versionNumber: currentPack.version || '1.0.0',
+      changelog,
+      releaseType
+    };
+
+    const res = await fetch(`/api/publish/${currentPack.id}/all`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+    logsEl.innerHTML = '';
+
+    if (data.success && data.results) {
+      let cardsHtml = '';
+
+      if (pushMr) {
+        const mr = data.results.modrinth;
+        if (mr && mr.success) {
+          cardsHtml += `
+            <div class="card" style="border-color: rgba(27, 217, 106, 0.4); margin-bottom: 0.5rem; padding: 0.85rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong style="color: var(--accent-modrinth);">🟢 Modrinth: Release Published!</strong>
+                <a class="btn btn-sm btn-modrinth" href="${escapeHtml(mr.url)}" target="_blank">View Version ↗</a>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">
+                Uploaded .mrpack version <code>${escapeHtml(mr.versionNumber)}</code> (ID: ${escapeHtml(mr.versionId)})
+              </div>
+            </div>
+          `;
+        } else {
+          cardsHtml += `
+            <div class="card" style="border-color: rgba(239, 68, 68, 0.4); margin-bottom: 0.5rem; padding: 0.85rem;">
+              <strong style="color: var(--accent-danger);">❌ Modrinth Upload Failed:</strong>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">${escapeHtml(mr?.error || 'Unknown error')}</div>
+            </div>
+          `;
+        }
+      }
+
+      if (pushCf) {
+        const cf = data.results.curseforge;
+        if (cf && cf.success) {
+          cardsHtml += `
+            <div class="card" style="border-color: rgba(241, 100, 54, 0.4); margin-bottom: 0.5rem; padding: 0.85rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <strong style="color: var(--accent-curseforge);">🟠 CurseForge: Modpack Uploaded!</strong>
+                <a class="btn btn-sm btn-curseforge" href="${escapeHtml(cf.url)}" target="_blank">View Project ↗</a>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">
+                Uploaded manifest zip (File ID: ${escapeHtml(cf.fileId)})
+              </div>
+            </div>
+          `;
+        } else {
+          cardsHtml += `
+            <div class="card" style="border-color: rgba(239, 68, 68, 0.4); margin-bottom: 0.5rem; padding: 0.85rem;">
+              <strong style="color: var(--accent-danger);">❌ CurseForge Upload Failed:</strong>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">${escapeHtml(cf?.error || 'Unknown error')}</div>
+            </div>
+          `;
+        }
+      }
+
+      logsEl.innerHTML = cardsHtml;
+    } else {
+      logsEl.innerHTML = `<div style="color: var(--accent-danger); font-size: 0.85rem;">Upload error: ${escapeHtml(data.error || 'Failed')}</div>`;
+    }
+  } catch (err) {
+    logsEl.innerHTML = `<div style="color: var(--accent-danger); font-size: 0.85rem;">Error: ${escapeHtml(err.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '⚡ Flush Auto-Push to Platforms';
   }
 }
 

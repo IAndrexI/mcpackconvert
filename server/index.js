@@ -9,6 +9,7 @@ import packsRouter from './routes/packs.js';
 import modsRouter from './routes/mods.js';
 import updatesRouter from './routes/updates.js';
 import exportRouter from './routes/export.js';
+import publishRouter from './routes/publish.js';
 import { ensurePacksDir } from './services/packManager.js';
 
 const app = express();
@@ -26,6 +27,7 @@ app.use('/api/packs', packsRouter);
 app.use('/api/mods', modsRouter);
 app.use('/api/updates', updatesRouter);
 app.use('/api/export', exportRouter);
+app.use('/api/publish', publishRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
