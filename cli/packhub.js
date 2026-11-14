@@ -3,7 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import path from 'path';
 import fs from 'fs/promises';
-import { createWriteStream } from 'fs';
+import { createWriteStream, existsSync } from 'fs';
 import { 
   createPack, 
   getPackDetails, 
@@ -12,12 +12,21 @@ import {
   removeMod, 
   checkAllUpdates, 
   applyUpdate,
-  listPacks
+  listPacks,
+  PACKS_DIR
 } from '../server/services/packManager.js';
 import { searchModrinth } from '../server/services/modrinth.js';
 import { searchCurseForge } from '../server/services/curseforge.js';
 import { exportPrismInstanceZip, exportMrpack, deployToPrismLauncher } from '../server/services/prismExporter.js';
 import { getDefaultPrismInstancesPath, PORT } from '../server/config.js';
+
+function resolvePackDir(packId) {
+  const inPacksDir = path.join(PACKS_DIR, packId);
+  if (existsSync(inPacksDir)) return inPacksDir;
+  const inCwd = path.join(process.cwd(), packId);
+  if (existsSync(inCwd)) return inCwd;
+  return inPacksDir;
+}
 
 const program = new Command();
 
@@ -210,7 +219,7 @@ program
   .option('--prism-path <path>', 'Custom Prism Launcher instances directory path')
   .action(async (opts) => {
     try {
-      const packDir = path.join(process.cwd(), 'data', 'packs', opts.pack);
+      const packDir = resolvePackDir(opts.pack);
       
       if (opts.deploy) {
         console.log(chalk.blue(`Deploying pack directly into Prism Launcher instances...`));
@@ -242,7 +251,7 @@ program
   .option('-o, --output <file>', 'Output .mrpack path')
   .action(async (opts) => {
     try {
-      const packDir = path.join(process.cwd(), 'data', 'packs', opts.pack);
+      const packDir = resolvePackDir(opts.pack);
       const outPath = opts.output || `${opts.pack}.mrpack`;
       const writeStream = createWriteStream(outPath);
       console.log(chalk.blue(`Exporting Modrinth .mrpack to ${outPath}...`));
