@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PackHub - Self-Hosted Modpack Manager</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="logo-group">
+      <div class="logo-icon">📦</div>
+      <div>
+        <div class="logo-title">PackHub</div>
+      </div>
+      <span class="badge-selfhost">Self-Hosted</span>
+    </div>
+    <div class="nav-actions">
+      <button class="btn btn-secondary btn-sm" id="btn-refresh" title="Refresh data">🔄 Refresh</button>
+      <button class="btn btn-primary" id="btn-new-pack">➕ New Pack</button>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="grid-2">
+      <!-- Sidebar / Packs list -->
+      <aside class="sidebar">
+        <div class="card">
+          <div class="card-title">
+            <span>Your Modpacks</span>
+            <span id="pack-count" class="tag">0</span>
+          </div>
+          <div id="packs-container" class="pack-list">
+            <!-- Dynamic pack items inserted here -->
+            <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1rem;">
+              Loading packs...
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Info Box -->
+        <div class="card" style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.5;">
+          <strong style="color: white; display: block; margin-bottom: 0.5rem;">💡 Self-Hosted Packwiz Server</strong>
+          This instance serves packs directly over HTTP. Mod updates query both <strong>Modrinth</strong> and <strong>CurseForge</strong> APIs simultaneously and can be imported directly into <strong>Prism Launcher</strong>.
+        </div>
+      </aside>
+
+      <!-- Active Pack Content -->
+      <section id="pack-view" class="pack-overview">
+        <!-- Pack Header Banner -->
+        <div class="pack-banner">
+          <div class="pack-info">
+            <h2 id="view-pack-name">Select a Pack</h2>
+            <p id="view-pack-desc" style="color: var(--text-muted); font-size: 0.85rem;">Select or create a modpack to begin managing mods.</p>
+            <div class="pack-tags">
+              <span id="tag-mc" class="tag tag-mc">MC 1.21.1</span>
+              <span id="tag-loader" class="tag tag-loader">Fabric</span>
+              <span id="tag-mods-count" class="tag">0 mods</span>
+            </div>
+          </div>
+          <div class="pack-actions-bar">
+            <button class="btn btn-prism" id="btn-prism-dialog">🚀 Prism Launcher</button>
+            <button class="btn btn-secondary" id="btn-check-updates">🔍 Check Updates</button>
+            <button class="btn btn-primary" id="btn-open-search">➕ Add Mods</button>
+          </div>
+        </div>
+
+        <!-- Update Alert Banner (Hidden by default) -->
+        <div id="update-alert" style="display: none; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3); border-radius: var(--radius-md); padding: 1rem; align-items: center; justify-content: space-between;">
+          <div>
+            <strong style="color: var(--accent-warning);">Updates Available!</strong>
+            <span id="update-alert-text" style="font-size: 0.85rem; color: var(--text-muted); margin-left: 0.5rem;">Found updates for installed mods.</span>
+          </div>
+          <button class="btn btn-sm btn-primary" id="btn-apply-all-updates">Update All Outdated</button>
+        </div>
+
+        <!-- Installed Mods Table -->
+        <div class="card" style="padding: 0;">
+          <div style="padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border);">
+            <div style="font-weight: 600;">Installed Mods</div>
+            <input type="text" id="filter-installed-mods" placeholder="Filter installed mods..." style="padding: 0.4rem 0.75rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: white; font-size: 0.8rem; width: 200px;">
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mod</th>
+                  <th>Source</th>
+                  <th>Side</th>
+                  <th>File / Hash</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="installed-mods-tbody">
+                <!-- Mod rows inserted dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- MODAL: Create New Pack -->
+  <div class="modal-overlay" id="modal-new-pack">
+    <div class="modal" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem;">Create New Modpack</h3>
+        <button class="btn btn-secondary btn-sm close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-create-pack">
+          <div class="form-group">
+            <label>Pack Name *</label>
+            <input type="text" class="form-input" id="new-pack-name" placeholder="My Awesome Pack" required>
+          </div>
+          <div class="form-group">
+            <label>Minecraft Version *</label>
+            <input type="text" class="form-input" id="new-pack-mc" value="1.21.1" placeholder="1.21.1" required>
+          </div>
+          <div class="form-group">
+            <label>Mod Loader</label>
+            <select class="form-select" id="new-pack-loader">
+              <option value="fabric">Fabric</option>
+              <option value="neoforge">NeoForge</option>
+              <option value="forge">Forge</option>
+              <option value="quilt">Quilt</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Author</label>
+            <input type="text" class="form-input" id="new-pack-author" placeholder="Your Name">
+          </div>
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" class="form-input" id="new-pack-desc" placeholder="A custom modpack managed with PackHub">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary close-modal">Cancel</button>
+        <button class="btn btn-primary" id="btn-submit-new-pack">Create Pack</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Dual Mod Search (CurseForge + Modrinth) -->
+  <div class="modal-overlay" id="modal-search">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem;">Search & Add Mods</h3>
+        <button class="btn btn-secondary btn-sm close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="search-controls">
+          <div class="search-input-group">
+            <input type="text" class="search-input" id="search-query" placeholder="Search mods by name or description (e.g. Sodium, JEI, Appleskin)...">
+            <button class="btn btn-primary" id="btn-run-search">Search</button>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+            <div class="source-tabs">
+              <button class="tab-btn active" data-source="all">🌐 All Sources</button>
+              <button class="tab-btn" data-source="modrinth">🟢 Modrinth</button>
+              <button class="tab-btn" data-source="curseforge">🟠 CurseForge</button>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem;">
+              <span>Target Side:</span>
+              <select class="form-select" id="mod-side-select" style="padding: 0.3rem 0.5rem; width: auto; font-size: 0.8rem;">
+                <option value="both">Both (Client & Server)</option>
+                <option value="client">Client Only</option>
+                <option value="server">Server Only</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search Status / Message -->
+        <div id="search-status" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; display: none;"></div>
+
+        <!-- Results Grid -->
+        <div class="results-grid" id="search-results">
+          <div style="text-align: center; padding: 2rem; color: var(--text-muted); font-size: 0.85rem;">
+            Type a query above to search Modrinth and CurseForge simultaneously.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Prism Launcher Integration -->
+  <div class="modal-overlay" id="modal-prism">
+    <div class="modal" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
+          🚀 Run Pack into Prism Launcher
+        </h3>
+        <button class="btn btn-secondary btn-sm close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+          Choose how you want to load this pack into Prism Launcher:
+        </p>
+
+        <!-- Method 1: Download Prism Instance Zip -->
+        <div class="card" style="margin-bottom: 1rem; border-color: rgba(59, 130, 246, 0.4);">
+          <div style="font-weight: 600; margin-bottom: 0.25rem; color: #60a5fa;">Option 1: Download Prism Instance (.zip)</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            Pre-configured zip with <code>instance.cfg</code> and <code>mmc-pack.json</code>.
+            In Prism Launcher, simply click <strong>"Add Instance"</strong> ➜ <strong>"Import from zip"</strong>.
+          </p>
+          <div style="display: flex; gap: 0.5rem;">
+            <a class="btn btn-prism btn-sm" id="btn-dl-prism-zip" href="#">📥 Download Prism Instance (.zip)</a>
+          </div>
+        </div>
+
+        <!-- Method 2: Download Modrinth mrpack -->
+        <div class="card" style="margin-bottom: 1rem; border-color: rgba(27, 217, 106, 0.4);">
+          <div style="font-weight: 600; margin-bottom: 0.25rem; color: var(--accent-modrinth);">Option 2: Download Modrinth (.mrpack)</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            Standard <code>.mrpack</code> format. In Prism Launcher, simply <strong>drag and drop</strong> the file onto the launcher window!
+          </p>
+          <a class="btn btn-modrinth btn-sm" id="btn-dl-mrpack" href="#">📥 Download .mrpack</a>
+        </div>
+
+        <!-- Method 3: Direct Local Deploy -->
+        <div class="card" style="margin-bottom: 1rem;">
+          <div style="font-weight: 600; margin-bottom: 0.25rem;">Option 3: 1-Click Direct Deploy to Local Prism</div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+            Deploys this instance directly into your local Prism Launcher instances directory!
+          </p>
+          <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label style="font-size: 0.75rem;">Instances Directory Path</label>
+            <input type="text" class="form-input" id="prism-local-path" style="font-size: 0.8rem;">
+          </div>
+          <button class="btn btn-primary btn-sm" id="btn-deploy-local-prism">⚡ Deploy into Prism Launcher Folder</button>
+          <div id="deploy-result" style="font-size: 0.8rem; margin-top: 0.5rem; display: none;"></div>
+        </div>
+
+        <!-- Method 4: Live Auto-Sync URL -->
+        <div class="instructions-box">
+          <strong style="color: white; display: block; margin-bottom: 0.25rem;">🔄 Live Self-Hosted Packwiz Sync URL:</strong>
+          <div class="code-pill" id="packwiz-sync-url">http://localhost:8080/api/packs/.../pack.toml</div>
+          <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-muted);">
+            Point the packwiz-installer or Prism pre-launch hook to this URL for automatic updates every time the game boots!
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

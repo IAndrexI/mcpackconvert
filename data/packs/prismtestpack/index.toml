@@ -1,0 +1,16 @@
+hash-format = "sha256"
+
+[[files]]
+file = "mods/appleskin.pw.toml"
+hash = "e9138c1acfd3d8d0cd52c6ff0fa8d5fbf63eb256ffd253fb1e03e024571c7cef"
+metafile = true
+
+[[files]]
+file = "mods/fabric-api.pw.toml"
+hash = "8af88ad3db8e8430c6370017ebb7ba3f5bc7d33fdb80258ab7d1fbc5d6b61937"
+metafile = true
+
+[[files]]
+file = "mods/sodium.pw.toml"
+hash = "7deaf232bca74d0e5168efc345ee109c908b724cddae1f571c3409eb2a99b52b"
+metafile = true

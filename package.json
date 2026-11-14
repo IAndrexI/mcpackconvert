@@ -1,0 +1,36 @@
+{
+  "name": "packhub",
+  "version": "1.0.0",
+  "description": "Self-hosted modpack manager with Modrinth & CurseForge support, packwiz compatibility, and Prism Launcher integration",
+  "main": "server/index.js",
+  "bin": {
+    "packhub": "cli/packhub.js"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "cli": "node cli/packhub.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "archiver": "^7.0.1",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "smol-toml": "^1.3.1"
+  },
+  "keywords": [
+    "minecraft",
+    "modpack",
+    "packwiz",
+    "modrinth",
+    "curseforge",
+    "prism-launcher",
+    "self-hosted"
+  ],
+  "author": "PackHub",
+  "license": "MIT"
+}

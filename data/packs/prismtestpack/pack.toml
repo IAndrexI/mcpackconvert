@@ -1,0 +1,14 @@
+name = "PrismTestPack"
+author = "Andre"
+version = "1.0.0"
+description = "A test pack for Prism Launcher verification"
+pack-format = "packwiz:1.1.0"
+
+[index]
+file = "index.toml"
+hash-format = "sha256"
+hash = "3767afdebe764c0d9cc1ed4ef8827d6fe8b96ada82045dc032eb63c3cadb432e"
+
+[versions]
+minecraft = "1.21.1"
+fabric = "0.16.9"

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  packhub:
+    build: .
+    container_name: packhub
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+      - DATA_DIR=/app/data
+      - CURSEFORGE_API_KEY=${CURSEFORGE_API_KEY:-$2a$10$bL4bIL5pUWqfcO7KQtnMReakwtfHbNKh6v1uTpKlzhwoueEJQnPnm}
+    volumes:
+      - ./data:/app/data
