@@ -267,8 +267,12 @@ program
 program
   .command('serve')
   .description('Start the self-hosted web server & pack distribution service')
-  .action(() => {
-    import('../server/index.js');
+  .option('-p, --port <port>', 'Preferred port to listen on', '8080')
+  .option('--open', 'Automatically open default browser to dashboard', false)
+  .action(async (opts) => {
+    const { startServer } = await import('../server/index.js');
+    if (opts.open) process.env.AUTO_OPEN_BROWSER = 'true';
+    await startServer(parseInt(opts.port, 10));
   });
 
 program.parse(process.argv);

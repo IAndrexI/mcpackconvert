@@ -16,3 +16,4 @@ Thumbs.db
 # Test export outputs
 data/*.zip
 data/*.mrpack
+data/server-info.json
